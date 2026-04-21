@@ -1,7 +1,5 @@
 # API Specification — Movie Tracker
 
-This document describes the endpoints for the Movie Tracker service. The service allows users to create accounts, search for films from an external movie database, curate a personal collection of movies, rate films they have watched, and query their collection by attributes such as genre, director, lead actor, personal rating, and release year.
-
 ## 1. Register a New User
 
 POST /users/register
@@ -24,74 +22,145 @@ Example response:
 
 ## 3. Search the External Movie Database
 
-GET /movies/external/search
+GET /movies/external/search/{title}/{year}
 
-Searches an external movie database for films matching a query. Accepts a title and an optional year. Returns a list of matches with their external_id, title, release year, director, lead actor, and genre.
-
-Example request: GET /movies/external/search?title=inception&year=2010
-
-## 4. Import a Movie into the Personal Database
-
-POST /movies
-
-Copies a movie record from the external database into our internal relational database using its external_id. Returns the movie with a new internal movie_id.
+Searches an external movie database for films matching a query. Accepts a title and year. Returns a list of matches with their external_id, title, release year, director, lead actor, genre, etc.
 
 Example response:
 
-{ "movie_id": 317, "title": "Inception", "release_year": 2010 }
+{
+  "results": [
+    {
+      "external_id": "tt1375666",
+      "title": "Inception",
+      "release_year": 2010,
+      "director": "Christopher Nolan",
+      "lead_actor": "Leonardo DiCaprio",
+      "genre": "Science Fiction"
+    }
+  ]
+}
 
-## 5. List Movies in the Personal Database
+## 4. Get a User's Saved Movies
 
-GET /movies
+GET /users/{user_id}/movies
 
-Returns movies that have been imported into our internal database. Supports optional filters for genre, director, lead_actor, and release_year.
-
-Example request: GET /movies?genre=Science%20Fiction&release_year=2010
-
-## 6. Get a Single Movie's Details
-
-GET /movies/{movie_id}
-
-Returns the full record of a single movie stored in our database, including runtime and synopsis.
-
-## 7. Add a Movie to a User's Collection
-
-POST /users/{user_id}/collection/{movie_id}
-
-Adds a movie that exists in our internal database to a user's personal collection. Optionally accepts a watched boolean in the body.
+Returns movies saved in users' collections, using metadata associated with each movie's external source record.
 
 Example response:
 
-{ "user_id": 1042, "movie_id": 317, "watched": true, "rating": null }
+{
+  "movies": [
+    {
+      "external_id": "tt1375666",
+      "title": "Inception",
+      "release_year": 2010,
+      "director": "Christopher Nolan",
+      "lead_actor": "Leonardo DiCaprio",
+      "genre": "Science Fiction"
+    }
+  ]
+}
 
-## 8. Update a Collection Entry
+## 5. Get a Single Movie's Details
 
-PUT /users/{user_id}/collection/{movie_id}
+GET /users/{user_id}/collection/{external_id}
 
-Updates a movie entry in the user's collection. Used to rate a film on a scale from 0 to 10 or to update watched status. Accepts optional rating and watched fields.
+Returns the full details for a single saved movie, including its external movie database information and any user-specific tracking data.
+
+Example response:
+
+{
+  "external_id": "tt1375666",
+  "title": "Inception",
+  "release_year": 2010,
+  "director": "Christopher Nolan",
+  "lead_actor": "Leonardo DiCaprio",
+  "genre": "Science Fiction",
+  "watched": true,
+  "rating": 9.5
+}
+
+## 6. Add a Movie to a User's Collection
+
+POST /users/{user_id}/collection/{external_id}
+
+Adds a movie from the external movie database directly to a user's personal collection. Optionally accepts a watched boolean in the body.
+
+Example response:
+
+{ "user_id": 1042, "external_id": "tt1375666", "watched": true, "rating": null }
+
+## 7. Update a Collection Entry
+
+PUT /users/{user_id}/collection/{external_id}
+
+Updates a movie entry in the user's watched list. Used to rate a film on a scale from 0 to 10 or to update watched status. Accepts optional rating and watched fields, and stores the updated tracking data in the personal database.
 
 Example request body:
 
 { "rating": 9.5, "watched": true }
 
-## 9. Remove a Movie from a User's Collection
+## 8. Remove a Movie from a User's Collection
 
-DELETE /users/{user_id}/collection/{movie_id}
+POST /users/{user_id}/collection/{external_id}/remove
 
-Removes a movie from the user's collection. The underlying movie record in the internal database is not deleted.
+Removes a movie from the user's watched list in the personal database. This only deletes the user's saved relationship to that movie, not the movie data from the external source.
 
-## 10. Query a User's Collection
+Example response:
 
-GET /users/{user_id}/collection
+{ "user_id": 1042, "external_id": "tt1375666", "removed": true }
+
+## 9. Query a User's Collection
+
+GET /users/{user_id}/collection/filter/{filter}
 
 Returns the movies in a user's collection with filtering and sorting. Supports optional query parameters genre, director, lead_actor, release_year, min_rating, max_rating, watched, sort_by, and order.
-
-Example request: GET /users/1042/collection?genre=Science%20Fiction&min_rating=8&sort_by=rating&order=desc
 
 Example response:
 
 {
   "collection": [
-    { "movie_id": 317, "title": "Inception", "rating": 9.5, "release_year": 2010 }
+    { "external_id": "tt1375666", "title": "Inception", "rating": 9.5, "release_year": 2010 }
+  ]
+}
+
+## 10. Generate Collection Insights
+
+GET /users/{user_id}/insights
+
+Analyzes a user's saved movies and ratings to compute summary statistics and preference trends, such as favorite genres, highest-rated directors, average rating by genre, and most frequently watched release decade.
+
+Example response:
+
+{
+  "favorite_genres": ["Science Fiction", "Thriller"],
+  "top_director": "Christopher Nolan",
+  "average_rating_by_genre": {
+    "Science Fiction": 9.1,
+    "Drama": 8.3
+  },
+  "most_watched_decade": "2010s"
+}
+
+## 11. Recommend Movies for a User
+
+GET /users/{user_id}/recommendations
+
+Uses the user's saved movies, ratings, and preferred attributes to return movie recommendations from the external movie database. 
+
+Example response:
+
+{
+  "recommendations": [
+    {
+      "external_id": "tt0816692",
+      "title": "Interstellar",
+      "release_year": 2014,
+      "director": "Christopher Nolan",
+      "lead_actor": "Matthew McConaughey",
+      "genre": "Science Fiction",
+      "predicted_rating": 9.2
+    }
   ]
 }
