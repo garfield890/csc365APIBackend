@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: potionpotionpotion
+    name: movieManager
     runtime: python
     plan: free
     autoDeploy: true
